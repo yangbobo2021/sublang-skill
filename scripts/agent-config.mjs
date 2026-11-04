@@ -6,7 +6,7 @@ import { SkillError } from './client.mjs';
 import { sameDirectory } from './platform.mjs';
 
 export const DEFAULT_MODELS = Object.freeze({codex: 'gpt-6.1-sol', claude: 'claude-opus-5-5'});
-export const NON_INITIALIZING_OPERATIONS = new Set(['settings', 'sessions', 'status', 'history', 'approvals', 'approval-respond', 'abort', 'control']);
+export const NON_INITIALIZING_OPERATIONS = new Set(['runtime-check', 'settings', 'sessions', 'status', 'history', 'approvals', 'approval-respond', 'abort', 'control']);
 const recordPath = home => join(home, 'local', 'skill-agent.json');
 
 export function hostSelection(args) {

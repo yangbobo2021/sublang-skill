@@ -1,0 +1,5 @@
+{
+  "repository": "https://github.com/sublang-ai/spex",
+  "commit": "420aba7b5ddadfbbc42ff0c6add7b4083cb29714",
+  "patch": "vendor/spex-source.patch"
+}

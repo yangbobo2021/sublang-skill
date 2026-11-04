@@ -1,12 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { SkillError, projectPath } from './client.mjs';
 import { sameDirectory } from './platform.mjs';
+import { runtimeCheck } from './runtime-check.mjs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const runtime = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const HELP = {
   usage: '<node> <cli> <operation> --project /absolute/git-root [options]',
   common: {'--spex-home': 'SPEX home; defaults to SPEX_HOME or ~/.spex', '--wait-seconds': 'Operation deadline; default 1800', '--scope': 'project (default) or personal for draft/package/config operations', '--host-agent': 'codex|claude, required on first use; later host changes do not reset configuration', '--host-model': 'Reliable current-host model; omit to use the adapter default on first use'},
   operations: {
     help: '', catalog: '[--query words]', inspect: '--workflow id [--package org/name]', 'project-add': '',
+    'runtime-check': '(diagnose the serving Core, built-ins and each installed workflow’s actual engine imports; never execute)',
     settings: '(read-only; uninitialized environments return next: preflight without opening Core)',
     preflight: '--host-agent codex|claude [--host-model model] (prepare once, then read effective settings; no workflow submission)',
     configure: '--json-file config-edit-op.json',
@@ -136,6 +142,7 @@ export async function execute(client, operation, args, {emit = () => {}, signal,
   };
 
   switch (operation) {
+    case 'runtime-check': return runtimeCheck(client,runtime,project?.id);
     case 'catalog': {
       const result = await catalog();
       if (args.query) {
@@ -168,6 +175,7 @@ export async function execute(client, operation, args, {emit = () => {}, signal,
     case 'run': {
       const workflow = await findWorkflow();
       if (!workflow.runs || !workflow.present || !workflow.command) throw new SkillError('workflow_blocked', 'The workflow is not runnable in this project.', {workflow});
+      await runtimeCheck(client,runtime,project.id,workflow);
       const input = textFile(args, 'request-file');
       if (!input.trim()) throw new SkillError('empty_request', 'The request file is empty.');
       emit({event: 'selected_workflow', id: workflow.name, package: workflow.package, version: workflow.version, command: workflow.command});

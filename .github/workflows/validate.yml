@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '25.5.0'
-      - run: node --test tests/platform.test.mjs tests/agent.test.mjs
+      - run: node --test tests/platform.test.mjs tests/agent.test.mjs tests/runtime.test.mjs
       - name: Prepare and exercise the standalone Core
         shell: pwsh
         run: |
@@ -32,7 +32,7 @@ jobs:
           & $prepared.node $prepared.cli help
           if ($LASTEXITCODE -ne 0) { throw 'CLI help failed' }
           $env:SUBLANG_TEST_RUNTIME = $prepared.runtime
-          node --test tests/agent-core.test.mjs tests/package-install.test.mjs
+          node --test tests/agent-core.test.mjs tests/package-install.test.mjs tests/runtime.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Agent initialization regression failed' }
           $project = Join-Path $env:RUNNER_TEMP 'sublang 测试 project'
           $state = Join-Path $env:RUNNER_TEMP 'sublang 测试 state'

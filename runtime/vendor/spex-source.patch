@@ -1,0 +1,283 @@
+diff --git a/packages/core/src/local-endpoint.ts b/packages/core/src/local-endpoint.ts
+new file mode 100644
+index 00000000..b89dd6a9
+--- /dev/null
++++ b/packages/core/src/local-endpoint.ts
+@@ -0,0 +1,30 @@
++// SPDX-License-Identifier: Apache-2.0
++// SPDX-FileCopyrightText: 2026 SubLang International <https://sublang.ai>
++
++import { randomUUID } from "node:crypto";
++import { chmodSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
++import { dirname, join } from "node:path";
++import { PROTOCOL_VERSION } from "./protocol.js";
++
++/** Local non-browser clients join the root's existing writer. The bearer
++ * remains in private local storage, never in protocol replies or logs. */
++export function publishLocalEndpoint(root: string, port: number, token: string): () => void {
++  const dir = join(root, "local");
++  mkdirSync(dir, { recursive: true, mode: 0o700 });
++  const stat = lstatSync(dir);
++  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("Local endpoint directory is not a plain directory");
++  const file = join(dir, "agent-endpoint.json");
++  const identity = randomUUID();
++  const bytes = JSON.stringify({ format: 1, identity, pid: process.pid, port, token, protocolVersion: PROTOCOL_VERSION });
++  const temporary = join(dirname(file), `.agent-endpoint-${identity}.tmp`);
++  try {
++    writeFileSync(temporary, bytes, { flag: "wx", mode: 0o600 });
++    if (process.platform !== "win32") chmodSync(temporary, 0o600);
++    renameSync(temporary, file);
++  } finally { rmSync(temporary, { force: true }); }
++  return () => {
++    try {
++      if (JSON.parse(readFileSync(file, "utf8")).identity === identity) rmSync(file);
++    } catch { /* A changed/unreadable descriptor is never ours to remove. */ }
++  };
++}
+diff --git a/packages/core/src/protocol.ts b/packages/core/src/protocol.ts
+index b8df2977..d7bf1abb 100644
+--- a/packages/core/src/protocol.ts
++++ b/packages/core/src/protocol.ts
+@@ -13,7 +13,7 @@ import type { AgentCapabilities, ApprovalDecision, ApprovalRequest, BrowserSetup
+ import type { SessionRecord as RuntimeRecord } from "@sublang/playbook/session-assets";
+ import { LANGUAGES, type Language } from "./language.js";
+ 
+-export const PROTOCOL_VERSION = 34;
++export const PROTOCOL_VERSION = 36;
+ 
+ /** The compile pipeline's phases and their human names, shared so the
+  * core's thread lines and the UI's band name a phase alike. */
+@@ -1275,6 +1275,7 @@ export const commandSchema = z.discriminatedUnion("type", [
+   z.object({ type: z.literal("credential.remove"), id, kind: z.enum(["host", "agent"]), name: z.string() }).strict(),
+   z.object({ type: z.literal("credential.list"), id }).strict(),
+   z.object({ type: z.literal("agent.options"), id, adapter: adapterNameSchema }),
++  z.object({ type: z.literal("runtime.info"), id, projectId: z.string().min(1).optional() }),
+   z.object({ type: z.literal("project.list"), id }),
+   z.object({ type: z.literal("project.register"), id, path: z.string().min(1) }),
+   /** Forget the working folder and delete its spex repository's clone
+@@ -1299,7 +1300,10 @@ export const commandSchema = z.discriminatedUnion("type", [
+     refresh: z.boolean().optional(),
+   }),
+   z.object({ type: z.literal("session.list"), id }),
+-  z.object({ type: z.literal("session.create"), id, projectId: z.string().min(1) }),
++  z.object({ type: z.literal("session.create"), id, projectId: z.string().min(1),
++    /** Agent discovery's selected identity, checked before opening a host. */
++    expectedWorkflow: z.object({id: z.string().min(1), command: z.string().min(1), package: z.string().min(1), version: z.string().min(1)}).strict().optional(),
++  }),
+   /** Pair a working folder with a spex repository (storage-22): the
+    * supplied aliases replace the alias list, omitted ones keep it. */
+   z.object({ type: z.literal("project.rebind"), id, projectId: repositoryKeySchema, path: z.string().min(1), aliases: z.array(z.string()).optional() }).strict(),
+@@ -1750,6 +1754,7 @@ export type CommandType = Command["type"];
+ 
+ /** Reply result payload per command type. */
+ export interface CommandResults {
++  "runtime.info": ReturnType<typeof import("./runtime-info.js").runtimeInfo>;
+   "agent.capabilities": AgentCapabilities;
+   "approval.list": ApprovalState;
+   "approval.respond": ApprovalAcknowledgement;
+diff --git a/packages/core/src/runtime-info.ts b/packages/core/src/runtime-info.ts
+new file mode 100644
+index 00000000..4ff2d958
+--- /dev/null
++++ b/packages/core/src/runtime-info.ts
+@@ -0,0 +1,71 @@
++// SPDX-License-Identifier: Apache-2.0
++// SPDX-FileCopyrightText: 2026 SubLang International <https://sublang.ai>
++
++// Read actual resolution from the serving Core and each registry's import
++// locations. Do not infer it from the caller's npm tree or package metadata.
++import { existsSync, readFileSync, realpathSync } from "node:fs";
++import { createRequire } from "node:module";
++import { dirname, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import { shippedBuiltinPackage } from "./builtins.js";
++
++export function resolvedPackage(from: string, specifier: string) {
++  const entry = realpathSync(createRequire(from).resolve(specifier));
++  let dir = dirname(entry);
++  for (;;) {
++    const manifest = join(dir, "package.json");
++    if (existsSync(manifest)) {
++      const data = JSON.parse(readFileSync(manifest, "utf8"));
++      if (data.name) return { name: String(data.name), version: String(data.version), root: realpathSync(dir), entry };
++    }
++    const parent = dirname(dir);
++    if (parent === dir) throw new Error(`No package manifest for ${specifier}`);
++    dir = parent;
++  }
++}
++
++// Follow local static imports, including the built-in registry's sibling
++// .playbook.js. Never walk node_modules or execute a workflow for diagnosis.
++function engineImports(module: string) {
++  const imports: { importer: string; specifier: string; resolved?: ReturnType<typeof resolvedPackage>; error?: string }[] = [];
++  const visited = new Set<string>();
++  const visit = (file: string) => {
++    file = realpathSync(file);
++    if (visited.has(file)) return;
++    visited.add(file);
++    if (visited.size > 500) throw new Error("Registry import graph exceeds diagnostic limit");
++    const source = readFileSync(file, "utf8");
++    for (const match of source.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)["']([^"'\s]+)["']/g)) {
++      const specifier = match[1]!;
++      if (/^(?:@sublang\/playbook|xstate)(?:\/|$)/.test(specifier)) {
++        try { imports.push({ importer: file, specifier, resolved: resolvedPackage(file, specifier) }); }
++        catch (error) { imports.push({ importer: file, specifier, error: (error as Error).message }); }
++      } else if (specifier.startsWith(".")) {
++        const child = resolve(dirname(file), specifier);
++        if (/\.(?:mjs|cjs|js)$/.test(child) && existsSync(child)) visit(child);
++      }
++    }
++  };
++  visit(module);
++  return imports;
++}
++
++export function runtimeInfo(placed: readonly { id: string; package: string; version: string; module: string; present: boolean; repository: string }[]) {
++  const from = fileURLToPath(import.meta.url);
++  const packages = Object.fromEntries(["@sublang/spex/environment", "@sublang/playbook/xstate-runtime", "xstate"].map(name => [name, resolvedPackage(from, name)]));
++  const buildFile = join(dirname(from), "..", "assets", "skill-runtime.json");
++  return {
++    core: { root: realpathSync(join(dirname(from), "..")), build: existsSync(buildFile) ? JSON.parse(readFileSync(buildFile, "utf8")) : null },
++    packages,
++    builtin: shippedBuiltinPackage(),
++    workflows: placed.map(row => {
++      let imports: ReturnType<typeof engineImports> = [], error: string | undefined;
++      if (row.present) {
++        try { imports = engineImports(row.module); } catch (cause) { error = (cause as Error).message; }
++      }
++      const playbook = imports.filter(i => i.specifier.startsWith("@sublang/playbook"));
++      const aligned = row.present && !error && playbook.length > 0 && imports.every(i => i.resolved && i.resolved.root === packages[i.specifier.startsWith("@sublang/playbook") ? "@sublang/playbook/xstate-runtime" : "xstate"]!.root);
++      return { ...row, imports, status: !row.present ? "missing" : aligned ? "aligned" : "unverified", ...(error ? { error } : {}) };
++    }),
++  };
++}
+diff --git a/packages/core/src/service.ts b/packages/core/src/service.ts
+index 6f725fc7..aa383141 100644
+--- a/packages/core/src/service.ts
++++ b/packages/core/src/service.ts
+@@ -163,6 +163,8 @@ import { currentRuntime, withGitCredential } from "./git-credential.js";
+ import { configureSeatGit } from "./seat-git.js";
+ import { displayRemote, validateRemoteUrl } from "./space-git.js";
+ import { isFastModeSupported, isSubagentModelSupported } from "@sublang/cligent";
++import { runtimeInfo } from "./runtime-info.js";
++import { publishLocalEndpoint } from "./local-endpoint.js";
+ import type { PlayerAdapterImports } from "@sublang/cligent/tmux-play";
+ 
+ const CORE_VERSION = "0.1.0";
+@@ -654,6 +656,7 @@ function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+ }
+ 
+ export class CoreService {
++  private removeLocalEndpoint?: () => void;
+   private readonly options: CoreServiceOptions;
+   /** Your own group's config, which follows its clone when your own
+    * group is renamed at sign-in (space-59); an explicit path stays. */
+@@ -1625,6 +1628,11 @@ export class CoreService {
+     // (core-service-128); each client is sent them as it connects.
+     service.places.start();
+     await service.listen(options.port ?? 0);
++    // Attached HTTP servers may not have bound yet and may be remote. Only
++    // the core-owned loopback endpoint is discoverable by local clients.
++    if (options.dataDir && !options.httpServer) {
++      service.removeLocalEndpoint = publishLocalEndpoint(options.dataDir, service.port(), service.token());
++    }
+     service.started = true;
+     return service;
+     } catch (error) {
+@@ -1902,6 +1910,8 @@ export class CoreService {
+ 
+   async stop(): Promise<void> {
+     this.stopping = true;
++    this.removeLocalEndpoint?.();
++    this.removeLocalEndpoint = undefined;
+     this.sessions.beginShutdown();
+     // The stop is bounded (core-service-39, DR-134): every active turn
+     // is aborted as admission closes; once those turns have settled, or
+@@ -2765,6 +2775,11 @@ export class CoreService {
+     if (command.type === "session.create" || command.type === "intent.queue") this.store.assertWritable({projectId:command.projectId});
+     if (command.type === "session.restore" || command.type === "session.discard" || command.type === "turn.submit" || command.type === "session.control") this.store.assertWritable({sessionId:command.sessionId});
+     switch (command.type) {
++      case "runtime.info": {
++        if (command.projectId && !this.store.getProject(command.projectId)) throw new CoreError("not_found", "Project is unavailable.");
++        await this.settledConfig();
++        return runtimeInfo(this.environments.modulesFor(command.projectId ?? null).placed?.() ?? []);
++      }
+       case "approval.list": return this.approvals.snapshot();
+       case "approval.respond": return this.approvals.respond(command.generation, command.requestId, command.owner, command.decision);
+       case "media.begin":
+@@ -3135,6 +3150,15 @@ export class CoreService {
+         void this.ensureGroupRepository(project.id).catch(() => {});
+         // Yours with the project.s own on top (core-service-2).
+         const composed = await this.composedFor(project.id);
++        if (command.expectedWorkflow) {
++          const expected = command.expectedWorkflow;
++          const selected = composed.playbooks.find(entry => entry.id === expected.id);
++          if (!selected || selected.command !== expected.command || selected.package !== expected.package || selected.version !== expected.version) {
++            // Reuse the existing conflict wording and keep package data out
++            // of the phrase catalog; clients refresh discovery on conflict.
++            throw changedMeanwhile("workflow selection");
++          }
++        }
+         const assertCurrent = () => {
+           try { context.assertCurrent(); }
+           catch { throw changedMeanwhile(join(this.store.dir, "home.yaml")); }
+diff --git a/specs/map.md b/specs/map.md
+index 3836143b..69e1eaa6 100644
+--- a/specs/map.md
++++ b/specs/map.md
+@@ -251,6 +251,7 @@ meta.md       The spec of specs
+ | [applets.md](packages/applets.md) | Applets in the IDE: a tab per installed applet in the project's workspace, `applet.open` and its capability, the paths the core serves under it with a read-only window on the working folder, the policy and sandbox confining the page |
+ | [cli.md](packages/cli.md) | The `spex` command line: the environment of the current folder with `add`, `remove`, `install`, `update`, `list` and `search`, a package built with `export` from the project's own files and published with `publish` from `spex-packages/<org>/<pkg>/` to the configured or public registry with a per-invocation override, `login`, `logout` and `whoami` independently at a registry or Space, no running app needed; scaffold and lint keep their packages |
+ | [app-shell.md](packages/app-shell.md) | Desktop shell: guarded source launch and ABI restoration; single-instance window, quit on a signal, notifications, dock badge, core-in-main over WebSocket, packaging, supplied compiler, scaffold CLI and agent SDKs; packaged-app acceptance |
++| [skill-runtime.md](packages/skill-runtime.md) | Standalone runtime build provenance and actual workflow engine resolution |
+ | [core-service.md](packages/core-service.md) | Headless core: WebSocket protocol, the root lease by machine identity, shared session lifecycle/recovery/deletion, per-agent summary folds, scoped storage diagnostics, config with its revision and batched edits, records and readiness |
+ | [dashboard.md](packages/dashboard.md) | Dashboard as the intent ledger: two-band attention queue, Running band, per-project History/Now/Up next/Sources groups, one-gesture capture, and shared queued-intent standing presentation; one deterministic core fold |
+ | [desktop-session.md](packages/desktop-session.md) | A Boss session in the packaged app: shell process topology, core streaming, and run-view rendering over one protocol |
+diff --git a/specs/packages/skill-runtime.md b/specs/packages/skill-runtime.md
+new file mode 100644
+index 00000000..ab9e3ff9
+--- /dev/null
++++ b/specs/packages/skill-runtime.md
+@@ -0,0 +1,41 @@
++# skill-runtime: Standalone Runtime Distribution
++
++## Intent
++
++Keep a standalone agent client on one auditable SPEX runtime and host Playbook engine.
++
++## External Behavior
++
++### skill-runtime-1
++
++When distributing the standalone runtime, the builder shall rebuild the CLI, Core and built-in content from one recorded upstream commit with a published source patch and locked dependencies.
++
++### skill-runtime-2
++
++When a local Core-owned endpoint starts, the Core shall publish its protocol, process, port and bearer in a private endpoint descriptor, withdrawing only its own descriptor on shutdown.
++
++### skill-runtime-3
++
++When session creation includes an expected workflow identity, the Core shall refuse an identity, command, package or version no longer present in the project's effective composition.
++
++### skill-runtime-4
++
++When runtime diagnostics are requested, the serving Core shall report its build source, installed packages and each placed registry's static engine import resolution without executing a workflow or exposing credentials.
++
++### skill-runtime-7
++
++When a new run is requested, the standalone client shall refuse an unverified engine resolution or a Core build differing from the distributed build before creating a session.
++
++## Verification
++
++### skill-runtime-5
++
++Distribution integration tests shall prepare an isolated runtime and check matching CLI/Core build provenance and freshly staged built-in content [[skill-runtime-1](#skill-runtime-1)], attach through the published endpoint [[skill-runtime-2](#skill-runtime-2)] and diagnose installed workflow imports including replaced stale engine links [[skill-runtime-4](#skill-runtime-4)].
++
++### skill-runtime-6
++
++Session integration tests shall reject a changed selected workflow before execution [[skill-runtime-3](#skill-runtime-3)].
++
++### skill-runtime-8
++
++Installation integration tests shall preserve a real user-owned dependency directory and refuse a new session when that directory supplies a different engine [[skill-runtime-7](#skill-runtime-7)].

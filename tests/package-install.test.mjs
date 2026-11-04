@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync, symlinkSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
@@ -15,7 +15,8 @@ const EVERYONE = 's-1-1-0';
 const workflow = 'storage-probe';
 const packageName = 'acceptance/storage-probe';
 const source = 'Storage fixture: installed, never executed.\n';
-const registryModule = `export const spexRegistryContract = 3;
+const registryModule = `import * as engine from '@sublang/playbook/xstate-runtime';
+export const spexRegistryContract = 3;
 export default {id:'storage-probe',command:'storage-probe',intent:'Install-only storage regression',artifactSchema:3,requiredRoleIds:[],validateOptions: x => x,createRuntime(){throw new Error('This installation test must never execute a workflow');}};\n`;
 
 function grant(path, rights) {
@@ -75,6 +76,47 @@ test('distributed package-add installs a Playbook under Windows read grants with
       assert.ok(readFileSync(join(project,'spex.lock'),'utf8').includes(packageName));
       const catalog = await invoke('catalog');
       assert.ok(catalog.workflows.some(w=>w.name===workflow && w.present && w.runs),'installed Playbook must be available without execution');
+      let diagnostic = await invoke('runtime-check');
+      assert.equal(diagnostic.aligned,true,JSON.stringify(diagnostic.issues));
+      assert.ok(diagnostic.workflows.length>=8,'all seven built-ins plus the installed fixture are checked');
+      for (const row of diagnostic.workflows) {
+        assert.equal(row.status,'aligned',row.module);
+        assert.ok(row.imports.some(i=>i.resolved?.name==='@sublang/playbook'));
+      }
+      // Model an existing installation pointing into an older cache. Only
+      // temporary fixture links change; Core's ordinary preparation repairs
+      // it on restart, without editing user config or package versions.
+      await core.close(); core=null;
+      const artifact = join(project,'.spex/packages/acceptance/storage-probe/playbooks/en/storage-probe');
+      const old = join(root,'old-cache','node_modules','@sublang','playbook');
+      mkdirSync(old,{recursive:true});
+      writeFileSync(join(old,'package.json'),JSON.stringify({name:'@sublang/playbook',version:'18.1.3',exports:{'./xstate-runtime':'./index.js'}}));
+      writeFileSync(join(old,'index.js'),'export {};\n');
+      const link = join(artifact,'node_modules','@sublang','playbook');
+      rmSync(link,{recursive:true,force:true});
+      symlinkSync(old,link,windows?'junction':'dir');
+      assert.equal(realpathSync(link),realpathSync(old));
+      core=await connect({runtime,home,coreOptions:{home:user,env,watchConfig:false,agentSignIn:async()=>({state:'signed-out'})}});
+      diagnostic=await invoke('runtime-check');
+      assert.equal(diagnostic.aligned,true,JSON.stringify(diagnostic.issues));
+      const row=diagnostic.workflows.find(w=>w.id===workflow);
+      assert.equal(row.status,'aligned');
+      assert.equal(realpathSync(link),realpathSync(join(runtime,'node_modules/@sublang/playbook')));
+      assert.equal(row.imports.find(i=>i.resolved?.name==='@sublang/playbook').resolved.version,'18.1.4');
+      // A user-owned real dependency directory must stay intact, but it
+      // cannot silently supply another engine to a new workflow run.
+      await core.close(); core=null;
+      rmSync(link,{recursive:true,force:true});
+      mkdirSync(link);
+      writeFileSync(join(link,'package.json'),readFileSync(join(old,'package.json')));
+      writeFileSync(join(link,'index.js'),'export {};\n');
+      core=await connect({runtime,home,coreOptions:{home:user,env,watchConfig:false,agentSignIn:async()=>({state:'signed-out'})}});
+      diagnostic=await invoke('runtime-check');
+      assert.equal(diagnostic.aligned,false);
+      assert.equal(diagnostic.workflows.find(w=>w.id===workflow).status,'unverified');
+      assert.equal(JSON.parse(readFileSync(join(link,'package.json'),'utf8')).version,'18.1.3');
+      const request=join(root,'request.txt'); writeFileSync(request,'Do not execute: the engine must be refused.');
+      await assert.rejects(invoke('run',['--workflow',workflow,'--request-file',request]),error=>JSON.parse(error.stdout).error.code==='runtime_mismatch');
       assert.deepEqual(await invoke('sessions'),[],'installation must never create or run a workflow session');
       if (windows) {
         assert.deepEqual(paths.map(descriptor),before,'installation must not rewrite existing directory ACLs');
