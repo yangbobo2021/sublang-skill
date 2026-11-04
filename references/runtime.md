@@ -5,7 +5,7 @@ or temporarily starts the distributed Core. Package management runs through
 Core's environment API and the SPEX library; it does not shell out to the
 Playbook CLI. This release retains that architecture.
 
-| Component | Identity and purpose | Expected in v1.0.5 |
+| Component | Identity and purpose | Expected in v1.0.6 |
 | --- | --- | --- |
 | SPEX package library and CLI | npm `@sublang/spex`; environment, file and package operations | 5.0.0, rebuilt with the recorded source patch |
 | SPEX Core | npm `@sublang/spex-core`; composition, configuration and sessions | 0.1.0, same source tree and lock as CLI; protocol 36 |
@@ -76,3 +76,5 @@ unrecorded changes; it does not mean an unmodified upstream build.
 Use native macOS and Windows setup/installation tests, including stale engine
 links and Windows read grants. The four manual acceptance workflows are never
 executed by CI. These checks do not establish customer-machine acceptance.
+
+Native file notifications can fail inside an agent sandbox even with a high file-descriptor limit. Core falls back to directory polling for synchronous or asynchronous watcher failures on macOS and Windows, retaining config/session change observation without changing permissions or limits.
