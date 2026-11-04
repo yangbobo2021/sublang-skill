@@ -67,7 +67,7 @@ Windows 用 `scripts/setup.ps1` 代替 Shell 初始化。发布新版本时可�
 
 2026-11-04：13 项 macOS 集成、独立分发与 Windows 路径模拟测试通过；PowerShell 语法检查通过。[公开仓库 CI](https://github.com/yangbobo2021/sublang-skill/actions/runs/41826418646) 已在 macOS 和 Windows 完成独立初始化、CLI help、Core 项目登记及目录发现冒烟检查。
 
-这些基础检查没有执行 extract-specs、decide、code 或 acceptance-orchestrate。四工作流交付验收由操作者按[手动操作文档](https://github.com/yangbobo2021/skills-acceptance-demo/blob/manual-v1.0.0/MANUAL-ACCEPTANCE.md)逐步触发，不放进 CI；真实模型、人工 Gate 和完整工作流结果须另外取证。Windows 客户端按用户要求不新增所有者、私有权限或 DACL 检查。
+这些基础检查没有执行 extract-specs、decide、code 或 acceptance-orchestrate。四工作流交付验收由操作者按[手动操作文档](https://github.com/yangbobo2021/skills-acceptance-demo/blob/manual-v1.0.1/MANUAL-ACCEPTANCE.md)逐步触发，不放进 CI；真实模型、人工 Gate 和完整工作流结果须另外取证。Windows 客户端按用户要求不新增所有者、私有权限或 DACL 检查。
 
 当前 v1.0.0 尚未实现首次调用自动跟随宿主并固定所有 Agent/模型的新规则；可通过 Skill 的 `configure` 显式配置，详见手动文档。
 
