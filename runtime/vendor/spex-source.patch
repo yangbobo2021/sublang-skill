@@ -77,10 +77,10 @@ index b8df2977..d7bf1abb 100644
    "approval.respond": ApprovalAcknowledgement;
 diff --git a/packages/core/src/runtime-info.ts b/packages/core/src/runtime-info.ts
 new file mode 100644
-index 00000000..4ff2d958
+index 00000000..284c3003
 --- /dev/null
 +++ b/packages/core/src/runtime-info.ts
-@@ -0,0 +1,71 @@
+@@ -0,0 +1,74 @@
 +// SPDX-License-Identifier: Apache-2.0
 +// SPDX-FileCopyrightText: 2026 SubLang International <https://sublang.ai>
 +
@@ -137,9 +137,12 @@ index 00000000..4ff2d958
 +  const from = fileURLToPath(import.meta.url);
 +  const packages = Object.fromEntries(["@sublang/spex/environment", "@sublang/playbook/xstate-runtime", "xstate"].map(name => [name, resolvedPackage(from, name)]));
 +  const buildFile = join(dirname(from), "..", "assets", "skill-runtime.json");
++  const cliBuildFile = join(packages["@sublang/spex/environment"]!.root, "dist", "skill-runtime.js");
++  const cliBuild = existsSync(cliBuildFile) ? JSON.parse(readFileSync(cliBuildFile, "utf8").replace(/^export default /, "").replace(/;\s*$/, "")) : null;
 +  return {
 +    core: { root: realpathSync(join(dirname(from), "..")), build: existsSync(buildFile) ? JSON.parse(readFileSync(buildFile, "utf8")) : null },
 +    packages,
++    cliBuild,
 +    builtin: shippedBuiltinPackage(),
 +    workflows: placed.map(row => {
 +      let imports: ReturnType<typeof engineImports> = [], error: string | undefined;

@@ -63,7 +63,7 @@ Windows 用 `scripts/setup.ps1` 代替 Shell 初始化。发布新版本时可�
 
 从远端更新使用 `git pull --ff-only`。保留用户未提交内容；回退共享历史优先使用 `git revert`。
 
-`runtime/vendor` 保存当前锁定的 SPEX CLI/Core 运行包，来源由 `runtime/release.json` 记录。需要更新这些上游运行包时使用 SPEX 仓库的独立分发构建器，再审查更新差异。
+`runtime/vendor` 保存当前锁定的 SPEX CLI/Core 运行包，来源由 `runtime/release.json` 记录。需要更新运行包时，使用本仓库 `scripts/build-runtime.mjs --repository <本地 SPEX Git 仓库>`，从 `runtime/source.json` 固定的上游提交加公开源码补丁统一重建 CLI、Core 和内置内容；不得只替换其中一个压缩包。组件关系、实际解析诊断和重建步骤见 [运行时说明](references/runtime.md)。
 
 ## 验证边界
 
@@ -73,9 +73,13 @@ Windows 用 `scripts/setup.ps1` 代替 Shell 初始化。发布新版本时可�
 
 v1.0.2 增加执行前 `preflight`，修复 v1.0.1 在 settings 预检查时把未初始化误当成配置冲突而停下的问题。未初始化时的 settings 不启动 Core、不生成 Claude 默认配置；首次业务调用由 Skill 自动准备，再核对设置。升级现有安装后，历史会话仍保留原 Agent 快照；新会话使用初始化后的配置。
 
-v1.0.3 将 npm 运行时 `@sublang/playbook` 精确升级到 `18.1.4`，锁文件和分发清单同步更新。Core 复用同一安装版本；内置 SPEX 规格包 `sublang/playbooks@18.1.3` 的版本独立保留。
+v1.0.3 将 npm 运行时 `@sublang/playbook` 精确升级到 `18.1.4`，锁文件和分发清单同步更新。该版本当时保留了旧 Core，所以内置 SPEX 内容包仍由 Playbook 18.1.3 生成；npm 引擎升级没有同步重建内置内容，此问题由 v1.0.5 修复。
 
 v1.0.4 将 SPEX 上游 `420aba7b` 的 Windows 存储修复重新打包进 `runtime/vendor/spex-cli.tgz`，Core 复用这份文件/环境库：普通已有目录与包安装目标不再因只读授权被拒绝；依赖完整性的租约等位置仍拒绝其他主体可修改的记录。`release.json.artifactSources` 记录两个运行包各自的来源，CLI 版本号仍为 5.0.0，须按 Skill 标签和制品哈希识别修复。新增真实 package-add 的 Windows ACL 回归；只安装测试 Playbook，不执行工作流。
+
+v1.0.5 将 CLI、Core、内置内容由同一固定源码树和锁文件统一重建，两个压缩包均携带相同构建记录。npm Playbook 与生成的内置 `sublang/playbooks` 均为 18.1.4；协议为 36。新增 `runtime-check` 检查实际提供服务的 Core 和各工作流的静态引擎导入路径，新运行在选定工作流无法对齐引擎或 Core/CLI 构建来源不符时，在创建会话前停止。已有内容版本锁定不被 Skill 升级静默改写。
+
+本次 macOS 的 15 项回归通过，包括旧链接修复、保留真实依赖目录并在引擎不符时拒绝提交；两个真实市场包安装后，连同内置包的 39 个入口静态引擎解析全部指向本发布 Playbook 18.1.4，没有创建或执行工作流会话。原生 Windows 结果见对应提交的公开 CI；这不代表用户机器或四工作流的人工交付验收已经通过。
 
 ## License
 

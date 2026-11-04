@@ -10,6 +10,7 @@ export async function runtimeCheck(client, runtime, projectId, selection) {
   const issues = [];
   const build = info.core.build;
   if (!build || ['commit','tree','patchSha256','lockSha256'].some(k=>build[k]!==release.source[k])) issues.push({kind:'core_build_mismatch'});
+  if (!info.cliBuild || ['commit','tree','patchSha256','lockSha256'].some(k=>info.cliBuild[k]!==release.source[k])) issues.push({kind:'cli_build_mismatch'});
   if (info.builtin?.version !== release.builtinPackage.version) issues.push({kind:'builtin_version_mismatch',actual:info.builtin?.version});
   if (info.packages['@sublang/playbook/xstate-runtime'].version !== release.dependencies['@sublang/playbook']) issues.push({kind:'host_engine_version_mismatch'});
   const workflows = selection ? info.workflows.filter(w=>w.id===selection.name && w.package===selection.package && w.repository===selection.repository) : info.workflows;
