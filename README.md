@@ -88,3 +88,5 @@ v1.0.7 修复沙箱禁止 PID 信号探测时无法连接已有 Core 的问题�
 ## License
 
 保留所附 [Apache-2.0 LICENSE](LICENSE) 及上游版权声明。
+
+v1.0.8 明确仅安装、准备运行时或查看帮助时不连接 Core、不初始化 Agent；首次实际 Core 请求仍由 Skill 自动初始化。CLI/Core 的成对归档和依赖锁定沿用 v1.0.7。

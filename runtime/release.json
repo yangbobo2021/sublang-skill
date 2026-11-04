@@ -1,9 +1,9 @@
 {
   "format": 1,
   "skill": "sublang",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "protocolVersion": 36,
-  "builtAt": "2026-11-04T18:41:46.003Z",
+  "builtAt": "2026-11-04T19:11:47.990Z",
   "sourceCommit": "420aba7b5ddadfbbc42ff0c6add7b4083cb29714",
   "sourceDirty": false,
   "dependencies": {
@@ -21,10 +21,10 @@
     "references/agents.md": "6884da10c6a6e9443d99ad6b5f8c814c30b49e34e80ae5b0886c9a95f0409010",
     "references/authoring.md": "a0a5a8a68efb62dc05b1c7c66f59fbd3177bb25f9aa8ab78de55c9fe09089cee",
     "references/execution.md": "f95a19860430a07da955b257de394595b06ca1bd4f3b903fef29db6b4bc3838d",
-    "references/runtime.md": "71898ae8f6deae8fc8d65a942fa42fbc0efeb860ac8c5992ac54a02dbe872379",
+    "references/runtime.md": "6276c6ac115ec8fa2e143633e54e58d4b946800ca2646962c230e7f1027b85f9",
     "runtime/node-checksums.txt": "e022a420c357fc1c34538b34fcefca0c35814ad38ca039f270d60fe7decd1b83",
-    "runtime/package-lock.json": "dad8741ce85e6d3b9497dde88127f0db51f8d86375ec9219fe697c31802b6d98",
-    "runtime/package.json": "dd1d624c19fec9f6de5278e4a3dfa3223cdca3c5aa30614f656d3067fd594044",
+    "runtime/package-lock.json": "d941d156de55f2b1bdb4a05ca52e1e4498251cd57d023b41ffcec14dde9de453",
+    "runtime/package.json": "04091c0206147934f5ec9e779cc550cc73f601ba037115853fb963a96e3808ab",
     "runtime/source.json": "5c39fb95ec2c5ee5a24723bdd72003367df7ab56850adb55fc7fc106af30d6f5",
     "runtime/vendor/spex-cli.tgz": "996b3552896e903ad4ecebb07ab01fc01f86255d56a42acb01366d6a1d339687",
     "runtime/vendor/spex-core.tgz": "8a534b4879f1e095b7dec2240d6a6206ee6d6b17d247ac92918ac1e6360ae9a1",
@@ -41,7 +41,7 @@
     "scripts/setup.sh": "70a60d98ba84282f00469f442e17459b103c45d94ae246e7df8ff08ce1bfbcdc",
     "scripts/sublang.mjs": "04ac24a0b2ff63bea0c2b24638a38e8fe9abae937e1c01d6a032c64bf1d13670",
     "scripts/update-release.mjs": "3053762ff91e0fbc18707b97d55c47ecaaaf9d75a669d27bdbb782e6fcfc3b0b",
-    "SKILL.md": "49267131b1c14eb2558dd3dcf6487486d822511a2ef125466674070124dfc5e4"
+    "SKILL.md": "a7f4a6c426213f8c2ab2fb0716a89b1a4f36e64e035ce93f082def9bf20c0895"
   },
   "artifactSources": {
     "runtime/vendor/spex-cli.tgz": {
