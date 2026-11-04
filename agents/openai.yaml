@@ -1,0 +1,5 @@
+interface:
+  display_name: "SubLang"
+  short_description: "Discover and run reusable workflows shared with SPEX"
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,46 @@
+name: Validate standalone Skill
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '25.5.0'
+      - run: node --test tests/platform.test.mjs
+      - name: Prepare and exercise the standalone Core
+        shell: pwsh
+        run: |
+          if ($IsWindows) {
+            $prepared = powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup.ps1 | ConvertFrom-Json
+          } else {
+            $prepared = sh ./scripts/setup.sh | ConvertFrom-Json
+          }
+          if ($LASTEXITCODE -ne 0 -or -not $prepared.ok) { throw 'Runtime preparation failed' }
+          & $prepared.node $prepared.cli help
+          if ($LASTEXITCODE -ne 0) { throw 'CLI help failed' }
+          $project = Join-Path $env:RUNNER_TEMP 'sublang 测试 project'
+          $state = Join-Path $env:RUNNER_TEMP 'sublang 测试 state'
+          New-Item -ItemType Directory -Path $project | Out-Null
+          git init -q $project
+          if ($LASTEXITCODE -ne 0) { throw 'Fixture Git initialization failed' }
+          $catalog = & $prepared.node $prepared.cli catalog --project $project --spex-home $state --wait-seconds 90 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $catalog.ok -or $catalog.result.projectRegistered) { throw 'Initial discovery failed' }
+          $added = & $prepared.node $prepared.cli project-add --project $project --spex-home $state --wait-seconds 90 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $added.ok) { throw 'Project registration failed' }
+          $catalog = & $prepared.node $prepared.cli catalog --project $project --spex-home $state --wait-seconds 90 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $catalog.ok -or -not $catalog.result.projectRegistered) { throw 'Registered discovery failed' }
+          $inspect = @($catalog.result.workflows | Where-Object { $_.id -eq 'inspect' -and $_.runs })
+          if ($inspect.Count -eq 0) { throw 'The built-in inspect workflow is not runnable' }
