@@ -130,6 +130,96 @@ index b8df2977..d7bf1abb 100644
    "agent.capabilities": AgentCapabilities;
    "approval.list": ApprovalState;
    "approval.respond": ApprovalAcknowledgement;
+diff --git a/packages/core/src/root-lease.ts b/packages/core/src/root-lease.ts
+index e90f322f..a2eecb8b 100644
+--- a/packages/core/src/root-lease.ts
++++ b/packages/core/src/root-lease.ts
+@@ -110,6 +110,7 @@ export class StateRootLeaseError extends Error {
+     readonly dir: string,
+     readonly lock: string,
+     reason: string,
++    readonly fsCode?: string,
+   ) {
+     super(
+       i18n._({
+@@ -217,7 +218,7 @@ function readOwner(dir: string, lock: string): RootLeaseOwner {
+   try {
+     stat = lstatSync(lock);
+   } catch (error) {
+-    throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)));
++    throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)), errorCode(error));
+   }
+   if (stat.isSymbolicLink() || !stat.isDirectory()) {
+     throw new StateRootLeaseError(dir, lock, reasons.malformed());
+@@ -226,7 +227,7 @@ function readOwner(dir: string, lock: string): RootLeaseOwner {
+   try {
+     names = readdirSync(lock);
+   } catch (error) {
+-    throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)));
++    throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)), errorCode(error));
+   }
+   if (names.length === 0) throw new StateRootLeaseError(dir, lock, reasons.empty());
+   if (names.length !== 1 || names[0] !== "owner.json") {
+@@ -287,14 +288,14 @@ function retire(
+     else mkdirSync(retiredRoot, { mode: 0o700 });
+   } catch (error) {
+     if (!["EEXIST", "already-exists"].includes(errorCode(error))) {
+-      throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)));
++      throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)), errorCode(error));
+     }
+   }
+   let rootStat;
+   try {
+     rootStat = lstatSync(retiredRoot);
+   } catch (error) {
+-    throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)));
++    throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)), errorCode(error));
+   }
+   if (rootStat.isSymbolicLink() || !rootStat.isDirectory() || !isPrivate(retiredRoot, rootStat)) {
+     throw new StateRootLeaseError(dir, lock, reasons.malformed());
+@@ -306,13 +307,13 @@ function retire(
+   } catch (error) {
+     if (error instanceof StateRootLeaseError) throw error;
+     if (errorCode(error) !== "ENOENT") {
+-      throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)));
++      throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)), errorCode(error));
+     }
+   }
+   try {
+     renameSync(lock, target);
+   } catch (error) {
+-    throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)));
++    throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)), errorCode(error));
+   }
+   afterRename?.(target);
+   const moved = readOwner(dir, target);
+@@ -337,7 +338,7 @@ export function acquireRootLease(dir: string, options: RootLeaseOptions): RootLe
+       lstatSync(lock);
+     } catch (error) {
+       if (errorCode(error) !== "ENOENT") {
+-        throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)));
++        throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)), errorCode(error));
+       }
+       present = false;
+     }
+@@ -368,7 +369,7 @@ export function acquireRootLease(dir: string, options: RootLeaseOptions): RootLe
+       else writeFileSync(join(stage, "owner.json"), ownerBytes, { mode: 0o600 });
+     } catch (error) {
+       rmSync(stage, { recursive: true, force: true });
+-      throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)));
++      throw new StateRootLeaseError(dir, lock, reasons.inspect(errorCode(error)), errorCode(error));
+     }
+     try {
+       renameSync(stage, lock);
+@@ -376,7 +377,7 @@ export function acquireRootLease(dir: string, options: RootLeaseOptions): RootLe
+       rmSync(stage, { recursive: true, force: true });
+       const code = errorCode(error);
+       if (code === "EEXIST" || code === "ENOTEMPTY") continue;
+-      throw new StateRootLeaseError(dir, lock, reasons.inspect(code));
++      throw new StateRootLeaseError(dir, lock, reasons.inspect(code), code);
+     }
+     const published = readOwner(dir, lock);
+     if (published.token !== token) throw new StateRootLeaseError(dir, lock, reasons.race());
 diff --git a/packages/core/src/runtime-info.ts b/packages/core/src/runtime-info.ts
 new file mode 100644
 index 00000000..284c3003
@@ -376,10 +466,10 @@ index 3836143b..69e1eaa6 100644
  | [desktop-session.md](packages/desktop-session.md) | A Boss session in the packaged app: shell process topology, core streaming, and run-view rendering over one protocol |
 diff --git a/specs/packages/skill-runtime.md b/specs/packages/skill-runtime.md
 new file mode 100644
-index 00000000..980b2832
+index 00000000..98a6c584
 --- /dev/null
 +++ b/specs/packages/skill-runtime.md
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,65 @@
 +# skill-runtime: Standalone Runtime Distribution
 +
 +## Intent
@@ -416,6 +506,10 @@ index 00000000..980b2832
 +
 +When a temporary Core's owning client finishes, the owner shall retain that Core until its other direct local API clients disconnect, without aborting their operations or removing the root lease to start another writer.
 +
++### skill-runtime-13
++
++When Windows transiently denies filesystem inspection of a root lease, the standalone client shall allow a bounded retry of full lease admission without deleting the lease or weakening its checks.
++
 +## Verification
 +
 +### skill-runtime-5
@@ -437,3 +531,7 @@ index 00000000..980b2832
 +### skill-runtime-12
 +
 +Integration tests shall complete concurrent local client operations against the actual temporary Core without losing their connections, then confirm normal shutdown without creating a workflow session [[skill-runtime-11](#skill-runtime-11)].
++
++### skill-runtime-14
++
++Native Windows integration tests shall inject transient and persistent lease-inspection errors, completing admission after the transient error and retaining refusal after the persistent error [[skill-runtime-13](#skill-runtime-13)].

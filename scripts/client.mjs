@@ -83,7 +83,7 @@ export class Client {
 export async function connect({runtime, home = process.env.SPEX_HOME || join(homedir(), '.spex'), emit, coreOptions = {}}) {
   home = resolve(home);
   const release = JSON.parse(readFileSync(join(runtime, 'release.json'), 'utf8'));
-  const startupDeadline = Date.now() + 5000;
+  let startupDeadline;
   let retiredRetries = 0;
   for (;;) {
     let service;
@@ -98,7 +98,10 @@ export async function connect({runtime, home = process.env.SPEX_HOME || join(hom
       } catch (error) {
         // A concurrently starting client may have acquired the one root lease.
         address = endpoint(home, release.protocolVersion);
-        if (!address && error.name === 'StateRootHeldError' && Date.now() < startupDeadline) {
+        const contended = error.name === 'StateRootHeldError' ||
+          (process.platform === 'win32' && error.name === 'StateRootLeaseError' && error.fsCode === 'EPERM');
+        if (!address && contended) startupDeadline ??= Date.now() + 5000;
+        if (!address && contended && Date.now() < startupDeadline) {
           // The writer may still be publishing its endpoint, or may have
           // finished a short operation before we observed it. The next
           // start still goes through Core's exclusive lease; never remove it.
