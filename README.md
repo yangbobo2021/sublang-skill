@@ -73,6 +73,8 @@ Windows 用 `scripts/setup.ps1` 代替 Shell 初始化。发布新版本时可�
 
 v1.0.2 增加执行前 `preflight`，修复 v1.0.1 在 settings 预检查时把未初始化误当成配置冲突而停下的问题。未初始化时的 settings 不启动 Core、不生成 Claude 默认配置；首次业务调用由 Skill 自动准备，再核对设置。升级现有安装后，历史会话仍保留原 Agent 快照；新会话使用初始化后的配置。
 
+v1.0.3 将 npm 运行时 `@sublang/playbook` 精确升级到 `18.1.4`，锁文件和分发清单同步更新。Core 复用同一安装版本；内置 SPEX 规格包 `sublang/playbooks@18.1.3` 的版本独立保留。
+
 ## License
 
 保留所附 [Apache-2.0 LICENSE](LICENSE) 及上游版权声明。

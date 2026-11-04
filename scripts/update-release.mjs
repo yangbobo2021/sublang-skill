@@ -23,6 +23,7 @@ if (values.version) {
     writeFileSync(path, JSON.stringify(data, null, 2) + '\n');
   }
 }
+release.dependencies = JSON.parse(readFileSync(join(root, 'runtime', 'package.json'), 'utf8')).dependencies;
 const files = {};
 const record = file => { files[relative(root, file).replaceAll('\\', '/')] = createHash('sha256').update(readFileSync(file)).digest('hex'); };
 const visit = dir => {
