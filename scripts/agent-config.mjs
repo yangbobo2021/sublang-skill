@@ -73,10 +73,15 @@ const roleOp = (playbook, role, binding) => ({kind: 'playbook.role.bind', playbo
 export async function ensureAgent(client, home, args, {reset = false, emit = () => {}, signal} = {}) {
   const local = join(home, 'local'), lock = join(local, 'skill-agent.lock');
   mkdirSync(local, {recursive: true});
-  try { mkdirSync(lock); }
-  catch (error) {
-    if (error.code !== 'EEXIST') throw error;
-    throw new SkillError('agent_config_busy', 'Another Skill agent initialization may be active; retry after it finishes. No lock was removed.');
+  const lockDeadline = Date.now() + 5000;
+  for (;;) {
+    if (signal?.aborted) throw new SkillError('interrupted', 'Agent initialization interrupted; no workflow was submitted.');
+    try { mkdirSync(lock); break; }
+    catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      if (Date.now() >= lockDeadline) throw new SkillError('agent_config_busy', 'Another Skill agent initialization may be active; retry after it finishes. No lock was removed.');
+      await new Promise(done => setTimeout(done, 50));
+    }
   }
   try {
     const check = () => { if (signal?.aborted) throw new SkillError('interrupted', 'Agent initialization interrupted; no workflow was submitted.'); };

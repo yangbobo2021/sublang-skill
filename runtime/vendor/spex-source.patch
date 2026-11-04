@@ -211,7 +211,7 @@ index 00000000..284c3003
 +  };
 +}
 diff --git a/packages/core/src/service.ts b/packages/core/src/service.ts
-index 6f725fc7..a0015d19 100644
+index 6f725fc7..229dee0c 100644
 --- a/packages/core/src/service.ts
 +++ b/packages/core/src/service.ts
 @@ -21,9 +21,7 @@ import {
@@ -297,8 +297,19 @@ index 6f725fc7..a0015d19 100644
          this.configWatchers.set(key, { dir, watcher });
        } catch {
          // A folder that left between the check and the watch: the next
-@@ -1902,6 +1905,8 @@ export class CoreService {
+@@ -1900,8 +1903,19 @@ export class CoreService {
+       .some((session) => session.live && this.sessions.getLive(session.id)?.turnActive);
+   }
  
++  /** A temporary host must not stop a Core another local client is using.
++   * Explicit App shutdown still calls stop() and retains its bounded abort. */
++  async stopWhenLocalClientsClose(): Promise<void> {
++    while (!this.stopping && this.clients.size > 0) {
++      await new Promise<void>((done) => setTimeout(done, 25));
++    }
++    if (!this.stopping) await this.stop();
++  }
++
    async stop(): Promise<void> {
      this.stopping = true;
 +    this.removeLocalEndpoint?.();
@@ -306,7 +317,7 @@ index 6f725fc7..a0015d19 100644
      this.sessions.beginShutdown();
      // The stop is bounded (core-service-39, DR-134): every active turn
      // is aborted as admission closes; once those turns have settled, or
-@@ -2442,7 +2447,7 @@ export class CoreService {
+@@ -2442,7 +2456,7 @@ export class CoreService {
      const dir = dirname(this.configPath);
      const file = basename(this.configPath);
      if (!existsSync(dir)) return;
@@ -315,7 +326,15 @@ index 6f725fc7..a0015d19 100644
        if (filename && filename !== file) return;
        this.scheduleReload();
      });
-@@ -2765,6 +2770,11 @@ export class CoreService {
+@@ -2546,6 +2560,7 @@ export class CoreService {
+       origin?: string;
+       req: { url?: string; headers: { host?: string } };
+     }): boolean => {
++      if (this.stopping) return false;
+       // Reject foreign browser origins outright: only the packaged
+       // file:// renderer (origin "file://" or "null"), local dev
+       // pages, a page served from the host this handshake itself
+@@ -2765,6 +2780,11 @@ export class CoreService {
      if (command.type === "session.create" || command.type === "intent.queue") this.store.assertWritable({projectId:command.projectId});
      if (command.type === "session.restore" || command.type === "session.discard" || command.type === "turn.submit" || command.type === "session.control") this.store.assertWritable({sessionId:command.sessionId});
      switch (command.type) {
@@ -327,7 +346,7 @@ index 6f725fc7..a0015d19 100644
        case "approval.list": return this.approvals.snapshot();
        case "approval.respond": return this.approvals.respond(command.generation, command.requestId, command.owner, command.decision);
        case "media.begin":
-@@ -3135,6 +3145,15 @@ export class CoreService {
+@@ -3135,6 +3155,15 @@ export class CoreService {
          void this.ensureGroupRepository(project.id).catch(() => {});
          // Yours with the project.s own on top (core-service-2).
          const composed = await this.composedFor(project.id);
@@ -357,10 +376,10 @@ index 3836143b..69e1eaa6 100644
  | [desktop-session.md](packages/desktop-session.md) | A Boss session in the packaged app: shell process topology, core streaming, and run-view rendering over one protocol |
 diff --git a/specs/packages/skill-runtime.md b/specs/packages/skill-runtime.md
 new file mode 100644
-index 00000000..06313444
+index 00000000..980b2832
 --- /dev/null
 +++ b/specs/packages/skill-runtime.md
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,57 @@
 +# skill-runtime: Standalone Runtime Distribution
 +
 +## Intent
@@ -393,6 +412,10 @@ index 00000000..06313444
 +
 +When native file notifications fail synchronously or asynchronously, the standalone Core shall retain file-change observation through polling without crashing or changing host permissions.
 +
++### skill-runtime-11
++
++When a temporary Core's owning client finishes, the owner shall retain that Core until its other direct local API clients disconnect, without aborting their operations or removing the root lease to start another writer.
++
 +## Verification
 +
 +### skill-runtime-5
@@ -410,3 +433,7 @@ index 00000000..06313444
 +### skill-runtime-10
 +
 +Integration tests shall start the actual Core with unavailable native watchers, observe an external configuration change and continue project operations without creating a workflow session [[skill-runtime-9](#skill-runtime-9)].
++
++### skill-runtime-12
++
++Integration tests shall complete concurrent local client operations against the actual temporary Core without losing their connections, then confirm normal shutdown without creating a workflow session [[skill-runtime-11](#skill-runtime-11)].

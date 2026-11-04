@@ -83,25 +83,52 @@ export class Client {
 export async function connect({runtime, home = process.env.SPEX_HOME || join(homedir(), '.spex'), emit, coreOptions = {}}) {
   home = resolve(home);
   const release = JSON.parse(readFileSync(join(runtime, 'release.json'), 'utf8'));
-  let service;
-  let address = endpoint(home, release.protocolVersion);
-  if (!address) {
-    const require = createRequire(join(runtime, 'package.json'));
-    const {CoreService} = await import(pathToFileURL(require.resolve('@sublang/spex-core')).href);
-    try {
-      service = await CoreService.start({dataDir: home,
-        env: prependPath(process.env, join(runtime, 'node_modules', '.bin')),
-        compileRuntime: {execPath: process.execPath, electron: false, modulePaths: [join(runtime, 'node_modules')]}, ...coreOptions});
-    } catch (error) {
-      // A concurrently starting client may have acquired the one root lease.
-      address = endpoint(home, release.protocolVersion);
-      if (!address) throw new SkillError(error.name === 'StateRootHeldError' ? 'core_busy' : 'core_start_failed', error.message + (error.name === 'StateRootHeldError' ? ' Close the older App if it does not expose a local endpoint; never remove its lease.' : ''));
+  const startupDeadline = Date.now() + 5000;
+  let retiredRetries = 0;
+  for (;;) {
+    let service;
+    let address = endpoint(home, release.protocolVersion);
+    if (!address) {
+      const require = createRequire(join(runtime, 'package.json'));
+      const {CoreService} = await import(pathToFileURL(require.resolve('@sublang/spex-core')).href);
+      try {
+        service = await CoreService.start({dataDir: home,
+          env: prependPath(process.env, join(runtime, 'node_modules', '.bin')),
+          compileRuntime: {execPath: process.execPath, electron: false, modulePaths: [join(runtime, 'node_modules')]}, ...coreOptions});
+      } catch (error) {
+        // A concurrently starting client may have acquired the one root lease.
+        address = endpoint(home, release.protocolVersion);
+        if (!address && error.name === 'StateRootHeldError' && Date.now() < startupDeadline) {
+          // The writer may still be publishing its endpoint, or may have
+          // finished a short operation before we observed it. The next
+          // start still goes through Core's exclusive lease; never remove it.
+          await new Promise(done => setTimeout(done, 100));
+          continue;
+        }
+        if (!address) throw new SkillError(error.name === 'StateRootHeldError' ? 'core_busy' : 'core_start_failed', error.message + (error.name === 'StateRootHeldError' ? ' Close the older App if it does not expose a local endpoint; never remove its lease.' : ''));
+      }
+      if (service) address = {port: service.port(), token: service.token()};
     }
-    if (service) address = {port: service.port(), token: service.token()};
+    const client = new Client(new WebSocket(`ws://127.0.0.1:${address.port}/?token=${encodeURIComponent(address.token)}`), release.protocolVersion, emit);
+    try { await client.ready(); } catch (error) {
+      client.close();
+      if (service) { await service.stopWhenLocalClientsClose(); throw error; }
+      // Another short-lived CLI can retire its endpoint after our read but
+      // before the handshake. Re-resolve only that retired/replaced address,
+      // before any RPC has been sent. A live unchanged endpoint (including
+      // rejected authentication) never causes another Core to be started.
+      if (retiredRetries < 2 && ['connection_failed', 'connection_closed', 'connection_timeout'].includes(error.code)) {
+        await new Promise(done => setTimeout(done, 100));
+        const current = endpoint(home, release.protocolVersion);
+        if (!current || ['pid', 'port', 'token', 'protocolVersion', 'identity'].some(key => current[key] !== address[key])) {
+          emit?.({event: 'core_retry', reason: 'endpoint_retired_before_handshake', attempt: ++retiredRetries});
+          continue;
+        }
+      }
+      throw error;
+    }
+    return {client, home, owned: !!service, async close() { client.close(); if (service) await service.stopWhenLocalClientsClose(); }};
   }
-  const client = new Client(new WebSocket(`ws://127.0.0.1:${address.port}/?token=${encodeURIComponent(address.token)}`), release.protocolVersion, emit);
-  try { await client.ready(); } catch (error) { client.close(); if (service) await service.stop(); throw error; }
-  return {client, home, owned: !!service, async close() { client.close(); if (service) await service.stop(); }};
 }
 
 export function projectPath(path) {

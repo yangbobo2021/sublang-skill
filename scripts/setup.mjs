@@ -11,7 +11,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 try {
   const releaseFile = join(root, 'runtime', 'release.json');
-  if (!existsSync(releaseFile)) throw new Error('This is a source Skill. Build its standalone distribution with scripts/build-sublang-skill.mjs in the SPEX repository first.');
+  if (!existsSync(releaseFile)) throw new Error('Incomplete Skill distribution: runtime/release.json is missing. Install the complete public Skill release.');
   const releaseBytes = readFileSync(releaseFile);
   const release = JSON.parse(releaseBytes);
   for (const [path, hash] of Object.entries(release.files)) {
@@ -39,7 +39,7 @@ try {
       const env = prependPath(process.env, dirname(process.execPath));
       const npm = npmInvocation(['ci', '--omit=dev', '--no-audit', '--no-fund'], {env});
       const installed = spawnSync(npm.command, npm.args, {cwd: target, env, stdio: ['ignore', 2, 2]});
-      if (installed.error || installed.status !== 0) throw new Error(`Locked dependency preparation failed (${installed.error?.message || installed.status}). Native dependencies may need Python and a C/C++ toolchain. Retry setup after repairing the prerequisite.`);
+      if (installed.error || installed.status !== 0) throw new Error(`Locked dependency preparation failed (${installed.error?.message || installed.status}). Inspect npm's error output above and resolve its reported cause before retrying setup.`);
       writeFileSync(ready, sha(releaseBytes), {mode: 0o600});
     } finally { rmSync(lock, {recursive: true, force: true}); }
   }

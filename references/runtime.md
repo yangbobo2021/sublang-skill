@@ -5,7 +5,7 @@ or temporarily starts the distributed Core. Package management runs through
 Core's environment API and the SPEX library; it does not shell out to the
 Playbook CLI. This release retains that architecture.
 
-| Component | Identity and purpose | Expected in v1.0.8 |
+| Component | Identity and purpose | Expected in v1.0.9 |
 | --- | --- | --- |
 | SPEX package library and CLI | npm `@sublang/spex`; environment, file and package operations | 5.0.0, rebuilt with the recorded source patch |
 | SPEX Core | npm `@sublang/spex-core`; composition, configuration and sessions | 0.1.0, same source tree and lock as CLI; protocol 36 |
@@ -80,3 +80,7 @@ executed by CI. These checks do not establish customer-machine acceptance.
 Native file notifications can fail inside an agent sandbox even with a high file-descriptor limit. Core falls back to directory polling for synchronous or asynchronous watcher failures on macOS and Windows, retaining config/session change observation without changing permissions or limits.
 
 If the host denies a PID signal probe with EPERM, the client still authenticates to the descriptor’s existing loopback endpoint and checks the exact protocol. A failed connection/authentication never starts a second Core; the existing writer and lease remain in place. A proven nonexistent PID still follows normal stale-endpoint handling.
+
+A competing temporary Core start is allowed up to five seconds to publish its endpoint or finish; every start still acquires Core’s exclusive lease. Before any RPC, a connection failure caused by a retired/replaced endpoint is re-resolved at most twice. An unchanged live endpoint still fails (including rejected authentication); no command is replayed and no lease is removed. An already submitted operation that loses its connection retains its uncertain outcome for inspection.
+
+A temporary host retains its Core until its other direct local API clients disconnect. Its printed result can precede process exit while another client still uses that Core. Explicit App shutdown retains its bounded cancellation behavior. Startup contention waits up to five seconds without removing a lease.
