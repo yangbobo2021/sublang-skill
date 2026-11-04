@@ -21,7 +21,16 @@ export function endpoint(home, protocolVersion) {
   if (data.format !== 1 || !Number.isSafeInteger(data.pid) || data.pid <= 0 || !Number.isInteger(data.port) || data.port < 1 || data.port > 65535 || typeof data.token !== 'string' || data.token.length < 1) {
     throw new SkillError('invalid_endpoint', 'SPEX local endpoint has invalid fields.');
   }
-  try { process.kill(data.pid, 0); } catch (error) { if (error.code === 'ESRCH') return null; throw new SkillError('endpoint_unverifiable', 'Cannot verify the SPEX endpoint owner.'); }
+  try { process.kill(data.pid, 0); }
+  catch (error) {
+    if (error.code === 'ESRCH') return null;
+    // Signal permission is not connection permission. In an agent sandbox
+    // (or another Windows process context), SIG0 may be forbidden while
+    // the authenticated loopback endpoint remains available. Keep the
+    // address: connect() must authenticate/protocol-check that existing
+    // writer, and must not start a second Core if attachment fails.
+    if (error.code !== 'EPERM') throw new SkillError('endpoint_unverifiable', 'Cannot verify the SPEX endpoint process.');
+  }
   if (data.protocolVersion !== protocolVersion) throw new SkillError('protocol_mismatch', `SPEX protocol ${data.protocolVersion} differs from this Skill's ${protocolVersion}; use matching releases or close the older App.`);
   return data;
 }

@@ -83,6 +83,8 @@ v1.0.5 将 CLI、Core、内置内容由同一固定源码树和锁文件统一�
 
 v1.0.6 修复 Codex workspace-write 沙箱内首次 Core 操作因文件监听器异步 `EMFILE` 而崩溃的问题。文件监听同步失败或异步报错时自动改用目录轮询，继续观察配置/会话变更；不改变权限、句柄限制或 Agent 配置。CLI、Core 和内置内容继续同源重建。18 项 macOS 回归通过，实际 Codex 沙箱内的候选 preflight 回归通过；Windows 同组测试已纳入 CI，原生执行结果另行记录。四工作流仍按手册逐步验收，不进入 CI。
 
+v1.0.7 修复沙箱禁止 PID 信号探测时无法连接已有 Core 的问题。仅 EPERM 时改为连接原端点并验证令牌与协议；认证失败仍拒绝，保留原写入者与租约。原 CLI/Core 同源制品保持不变。本机 19 项回归通过，并在实际 Codex 沙箱复现旧版失败、确认新版附加到同一 PID/identity；兼容测试包含 Windows 的同组场景。
+
 ## License
 
 保留所附 [Apache-2.0 LICENSE](LICENSE) 及上游版权声明。
