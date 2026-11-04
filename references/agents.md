@@ -1,0 +1,21 @@
+# Initialize and change the workflow Agent
+
+The calling assistant identifies its own host: Codex supplies `--host-agent codex`, Claude Code supplies `--host-agent claude`. This is independent of where the Skill is installed and which providers are logged in. Use an exact current-session model identifier only when the host reliably exposes it. Do not infer it from a previous conversation, the global config, adapter availability or a marketing name. If unavailable, omit `--host-model`: Codex defaults to `gpt-6.1-sol`, Claude to `claude-opus-5-5`, without an extra user question. Do not silently switch Agent/model when authentication, quota or model availability fails.
+
+After setup, pass these flags on normal discovery/package/execution calls. The first such call automatically initializes before its operation. `agent-init --project <root> --host-agent <host> [--host-model <model>]` can explicitly perform just this preparation. Neither setup nor initialization invokes a model or a Playbook. A missing host flag on an uninitialized environment fails before connecting to Core; no credential-based fallback is accepted.
+
+Initialization uses the existing Core protocol, including when attached to the App. It atomically edits the personal Captain, every Player and personal role tuning, preserving distinct Player IDs, instructions, role bindings and permissions. Old effort/fast-mode/browser/delegation tuning is cleared when selecting the Agent/model, so adapter-specific settings cannot contradict it. Codex receives the normal `.git` sandbox write grant, without enabling full access. Project settings only bind roles to Players; they do not admit their own model tuning. Validate the project’s effective bindings after updating the personal configuration. If effective configuration cannot be validated, fail before submitting a workflow.
+
+`<SPEX_HOME>/local/skill-agent.json` records the first choice and which Players/roles have been initialized. A pending record retains the original choice if initialization was interrupted. An active initializer's lock is not removed automatically. A Core revision conflict is reported; reread and retry after the competing edit finishes. Do not remove locks, session history or user configuration as a repair.
+
+After the record is ready, ordinary calls leave existing Agent settings unchanged, including user edits. Switching hosts, choosing another outer model, restarting or changing credentials does not reset them. Newly discovered Players inherit the current configured Captain's adapter/model; package operations complete this before returning. New roles cannot introduce conflicting default model pins. `settings` reports both the effective configuration and the initialization record and does not initialize or repair them.
+
+When the user asks to change the workflow Agent/model, run:
+
+```text
+<node> <cli> agent-configure --project <root> --host-agent codex [--host-model <requested-model>]
+```
+
+Use `claude` for Claude Code. This is an explicit replacement of the personal Captain/Players and personal role model pins; it is not inferred from later host flags. Missing `--host-model` selects that adapter's documented default. Report `settings`, actual configuration path, Captain/Player model choices and readiness after changing them. Authentication is never modified. Low-level `configure` remains available for explicit individual edits.
+
+Upgrading an existing pre-v1.0.1 installation does not migrate old session snapshots. Initialize/configure the environment, then start a new workflow session to use the new defaults. Before continuing a historical session, inspect its retained Agent/model; explain a mismatch and do not present it as already switched. Do not replay interrupted work as a new session without checking its retained state and the user's intent.

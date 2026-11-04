@@ -42,7 +42,9 @@ $sublang 将指定版本的 PLAYBOOK 包安装到当前项目。
 $sublang 查看指定包的工作流，并按我的请求执行。
 ```
 
-完整说明：[SKILL.md](SKILL.md)、[包管理和流程创作](references/authoring.md)、[执行和恢复](references/execution.md)。
+首次实际请求会按调用宿主初始化：Codex 使用 Codex，Claude Code 使用 Claude。能可靠取得当前会话模型时采用该模型，否则分别默认 `gpt-6.1-sol` / `claude-opus-5-5`。Captain、所有 Player 和角色模型保持一致；以后不随宿主、模型选择或凭据变化重设，新 Player 继承配置。用户可通过 Skill 明确要求重新配置。宿主登录不被修改。
+
+完整说明：[SKILL.md](SKILL.md)、[Agent 初始化与修改](references/agents.md)、[包管理和流程创作](references/authoring.md)、[执行和恢复](references/execution.md)。
 
 ## 版本维护
 
@@ -67,9 +69,9 @@ Windows 用 `scripts/setup.ps1` 代替 Shell 初始化。发布新版本时可�
 
 2026-11-04：13 项 macOS 集成、独立分发与 Windows 路径模拟测试通过；PowerShell 语法检查通过。[公开仓库 CI](https://github.com/yangbobo2021/sublang-skill/actions/runs/41826418646) 已在 macOS 和 Windows 完成独立初始化、CLI help、Core 项目登记及目录发现冒烟检查。
 
-这些基础检查没有执行 extract-specs、decide、code 或 acceptance-orchestrate。四工作流交付验收由操作者按[手动操作文档](https://github.com/yangbobo2021/skills-acceptance-demo/blob/manual-v1.0.1/MANUAL-ACCEPTANCE.md)逐步触发，不放进 CI；真实模型、人工 Gate 和完整工作流结果须另外取证。Windows 客户端按用户要求不新增所有者、私有权限或 DACL 检查。
+这些基础检查没有执行 extract-specs、decide、code 或 acceptance-orchestrate。四工作流交付验收由操作者按[12 步手动操作文档](https://github.com/yangbobo2021/skills-acceptance-demo/blob/main/MANUAL-ACCEPTANCE.md)逐步触发，不放进 CI；真实模型、人工 Gate 和完整工作流结果须另外取证。Windows 客户端按用户要求不新增所有者、私有权限或 DACL 检查。
 
-当前 v1.0.0 尚未实现首次调用自动跟随宿主并固定所有 Agent/模型的新规则；可通过 Skill 的 `configure` 显式配置，详见手动文档。
+v1.0.1 修复 v1.0.0 首次初始化按凭据优先选择 Claude 的问题。升级现有安装后，历史会话仍保留原 Agent 快照；新会话使用初始化后的配置。
 
 ## License
 

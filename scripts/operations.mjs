@@ -4,10 +4,12 @@ import { sameDirectory } from './platform.mjs';
 
 export const HELP = {
   usage: '<node> <cli> <operation> --project /absolute/git-root [options]',
-  common: {'--spex-home': 'SPEX home; defaults to SPEX_HOME or ~/.spex', '--wait-seconds': 'Operation deadline; default 1800', '--scope': 'project (default) or personal for draft/package/config operations'},
+  common: {'--spex-home': 'SPEX home; defaults to SPEX_HOME or ~/.spex', '--wait-seconds': 'Operation deadline; default 1800', '--scope': 'project (default) or personal for draft/package/config operations', '--host-agent': 'codex|claude, required on first use; later host changes do not reset configuration', '--host-model': 'Reliable current-host model; omit to use the adapter default on first use'},
   operations: {
     help: '', catalog: '[--query words]', inspect: '--workflow id [--package org/name]', 'project-add': '',
     settings: '', configure: '--json-file config-edit-op.json',
+    'agent-init': '--host-agent codex|claude [--host-model model] (initialize once)',
+    'agent-configure': '--host-agent codex|claude [--host-model model] (explicitly replace Captain/Players and personal role overrides)',
     run: '--workflow id [--package org/name] --request-file request.txt', continue: '--session uuid --request-file followup.txt',
     sessions: '', status: '--session uuid', history: '--session uuid [--after-seq n]',
     abort: '--session uuid', control: '--session uuid --kind recovery|ending --action advertised-id',
