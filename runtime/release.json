@@ -1,9 +1,9 @@
 {
   "format": 1,
   "skill": "sublang",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "protocolVersion": 35,
-  "builtAt": "2026-11-04T16:17:45.870Z",
+  "builtAt": "2026-11-04T16:40:51.492Z",
   "sourceCommit": "5cd6f403a6a57367f0849edffaecde6224e075af",
   "sourceDirty": true,
   "dependencies": {
@@ -22,9 +22,9 @@
     "references/authoring.md": "a0a5a8a68efb62dc05b1c7c66f59fbd3177bb25f9aa8ab78de55c9fe09089cee",
     "references/execution.md": "f95a19860430a07da955b257de394595b06ca1bd4f3b903fef29db6b4bc3838d",
     "runtime/node-checksums.txt": "e022a420c357fc1c34538b34fcefca0c35814ad38ca039f270d60fe7decd1b83",
-    "runtime/package-lock.json": "907e3a9987bd265b417df520c0a10941ea0a7d6f326a2b20b4da0b44f84c9e3d",
-    "runtime/package.json": "adf43fe06b1f3854dafacebcdd455ac899f980e7d5ac792649d6b6a33f03d099",
-    "runtime/vendor/spex-cli.tgz": "59e22e03cc6859e28f8a4255ae1a07e12430f42ec2c87afbf5662faf83613738",
+    "runtime/package-lock.json": "3615395dde09e5856eead1f86e2ec371f46ea9529f4497b43f10106779750452",
+    "runtime/package.json": "8e0a7db3de7c4c6284200f1b0ec7959fcadfe0d0638a01d76340db0b6a9882bc",
+    "runtime/vendor/spex-cli.tgz": "e291429ae43ca812594b8028d609341a4694c46dd463b3a40a49082f92b86851",
     "runtime/vendor/spex-core.tgz": "aa23076b8fc3c085ad2be57ddd3aea5d807e0972b45ebfb5f62b255a61967014",
     "scripts/agent-config.mjs": "836c048a812e10ea60f3758e4bb65654667c560073ec08d6e0692851b161c3e5",
     "scripts/client.mjs": "a297459dd4ecf05805d985141b1c1cc8187e79f387b60e814d5adbc8e3bc0091",
@@ -37,5 +37,19 @@
     "scripts/sublang.mjs": "04ac24a0b2ff63bea0c2b24638a38e8fe9abae937e1c01d6a032c64bf1d13670",
     "scripts/update-release.mjs": "3053762ff91e0fbc18707b97d55c47ecaaaf9d75a669d27bdbb782e6fcfc3b0b",
     "SKILL.md": "ff173dfddfb982d0c44010af7ffa9d901d739338909aa64ecb0f002bace6edb6"
+  },
+  "artifactSources": {
+    "runtime/vendor/spex-cli.tgz": {
+      "repository": "https://github.com/sublang-ai/spex",
+      "commit": "420aba7b5ddadfbbc42ff0c6add7b4083cb29714",
+      "dirty": false,
+      "note": "Windows storage follows upstream DR-223; built from clean worktree"
+    },
+    "runtime/vendor/spex-core.tgz": {
+      "repository": "https://github.com/sublang-ai/spex",
+      "commit": "5cd6f403a6a57367f0849edffaecde6224e075af",
+      "dirty": true,
+      "note": "Retained endpoint-enabled Core; imports the updated SPEX file/environment library"
+    }
   }
 }

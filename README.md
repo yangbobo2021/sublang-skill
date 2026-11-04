@@ -75,6 +75,8 @@ v1.0.2 增加执行前 `preflight`，修复 v1.0.1 在 settings 预检查时把�
 
 v1.0.3 将 npm 运行时 `@sublang/playbook` 精确升级到 `18.1.4`，锁文件和分发清单同步更新。Core 复用同一安装版本；内置 SPEX 规格包 `sublang/playbooks@18.1.3` 的版本独立保留。
 
+v1.0.4 将 SPEX 上游 `420aba7b` 的 Windows 存储修复重新打包进 `runtime/vendor/spex-cli.tgz`，Core 复用这份文件/环境库：普通已有目录与包安装目标不再因只读授权被拒绝；依赖完整性的租约等位置仍拒绝其他主体可修改的记录。`release.json.artifactSources` 记录两个运行包各自的来源，CLI 版本号仍为 5.0.0，须按 Skill 标签和制品哈希识别修复。新增真实 package-add 的 Windows ACL 回归；只安装测试 Playbook，不执行工作流。
+
 ## License
 
 保留所附 [Apache-2.0 LICENSE](LICENSE) 及上游版权声明。
