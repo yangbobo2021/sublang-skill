@@ -63,7 +63,7 @@ test('distributed package-add installs a Playbook under Windows read grants with
         assert.equal(value.ok,true,r.stdout);
         return value.result;
       };
-      await invoke('project-add');
+      const registered = await invoke('project-add');
       if (windows && timing==='after-core-start') widen();
       const before = windows ? paths.map(descriptor) : null;
       if (windows) for (const d of before) assert.ok(d.aces.some(a=>a.aceType==='allow' && a.sid.toLowerCase()===EVERYONE && a.mask!==0),'fixture must really carry the extra read grant');
@@ -76,6 +76,11 @@ test('distributed package-add installs a Playbook under Windows read grants with
       assert.ok(readFileSync(join(project,'spex.lock'),'utf8').includes(packageName));
       const catalog = await invoke('catalog');
       assert.ok(catalog.workflows.some(w=>w.name===workflow && w.present && w.runs),'installed Playbook must be available without execution');
+      await assert.rejects(core.client.request('session.create',{
+        projectId:registered.project.id,
+        expectedWorkflow:{id:workflow,command:workflow,package:packageName,version:'0.0.0'},
+      }),error=>error.code==='conflict');
+      assert.deepEqual(await invoke('sessions'),[],'a changed selected version must not create a session');
       let diagnostic = await invoke('runtime-check');
       assert.equal(diagnostic.aligned,true,JSON.stringify(diagnostic.issues));
       assert.ok(diagnostic.workflows.length>=8,'all seven built-ins plus the installed fixture are checked');
