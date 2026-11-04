@@ -1,9 +1,9 @@
 {
   "format": 1,
   "skill": "sublang",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "protocolVersion": 35,
-  "builtAt": "2026-11-04T14:32:21.013Z",
+  "builtAt": "2026-11-04T14:52:59.562Z",
   "sourceCommit": "5cd6f403a6a57367f0849edffaecde6224e075af",
   "sourceDirty": true,
   "dependencies": {
@@ -18,24 +18,24 @@
   "files": {
     "agents/openai.yaml": "0c6819a29980a73f684b20339a189441ffdb398f42d01b07d111de30ffed3934",
     "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-    "references/agents.md": "3bfad81b918262073c7e298f5b296488d63832c6c54fc23caab65e71dde79b35",
+    "references/agents.md": "6884da10c6a6e9443d99ad6b5f8c814c30b49e34e80ae5b0886c9a95f0409010",
     "references/authoring.md": "a0a5a8a68efb62dc05b1c7c66f59fbd3177bb25f9aa8ab78de55c9fe09089cee",
-    "references/execution.md": "9542c8a250f222665ac343328125ac5290d4c8d9c7c934ac11921715953faeeb",
+    "references/execution.md": "f95a19860430a07da955b257de394595b06ca1bd4f3b903fef29db6b4bc3838d",
     "runtime/node-checksums.txt": "e022a420c357fc1c34538b34fcefca0c35814ad38ca039f270d60fe7decd1b83",
-    "runtime/package-lock.json": "dc7b5e18aa9641a8ef964f32812e83b2fa8255fd3b7d0cc572e5d7fe9cb9b52c",
-    "runtime/package.json": "059268b1bf79ce0a1ed633b9bd35b0ad2de923ad63f96f5d10b25f180aa3219b",
+    "runtime/package-lock.json": "22b455fbe843118dba7425f4577eebd7ece197844783049af7d25142816d1af8",
+    "runtime/package.json": "27f2a9a295f41b6f670157baeb28d5550cbd5e4a83738d6b8bfd5a1a410802e9",
     "runtime/vendor/spex-cli.tgz": "59e22e03cc6859e28f8a4255ae1a07e12430f42ec2c87afbf5662faf83613738",
     "runtime/vendor/spex-core.tgz": "aa23076b8fc3c085ad2be57ddd3aea5d807e0972b45ebfb5f62b255a61967014",
     "scripts/agent-config.mjs": "836c048a812e10ea60f3758e4bb65654667c560073ec08d6e0692851b161c3e5",
     "scripts/client.mjs": "a297459dd4ecf05805d985141b1c1cc8187e79f387b60e814d5adbc8e3bc0091",
     "scripts/install.mjs": "13e066e9c1eebb3ce7b7d1ecde5cbc2a6f8fa8da1cbb367c3d083a95fc330999",
-    "scripts/operations.mjs": "2c87dc7476dbd31f2bf4dba0d3f2e0d364d027066cae4e1de541cf981543f8ed",
+    "scripts/operations.mjs": "fda1668fa29a26804c2950212adf1ae0584361abc66986e7ddfe4a29380a614e",
     "scripts/platform.mjs": "81b7dffecb978f42f9ba30715be1207e5ad94281c6773efcfe52f52af400f6ec",
     "scripts/setup.mjs": "b119efb0881f31a2a48dee858688a8dcd6d205252b939259bce1ee6df43e9d77",
     "scripts/setup.ps1": "57c8160adb084032355dd04ee49b2897d4d00d17faa2e221d74aec799132c884",
     "scripts/setup.sh": "70a60d98ba84282f00469f442e17459b103c45d94ae246e7df8ff08ce1bfbcdc",
-    "scripts/sublang.mjs": "cee868f1f6f535803a5d20558e7efb731cdf53b10a8cf81c54e10b632578bfae",
+    "scripts/sublang.mjs": "04ac24a0b2ff63bea0c2b24638a38e8fe9abae937e1c01d6a032c64bf1d13670",
     "scripts/update-release.mjs": "3c64adc5747636582989712892a78af01aeddcbeeac51003b8559583cf3130e3",
-    "SKILL.md": "613191462a2b3cf99df93332cb1fa5206fe2b7daea67d82322298f5f11d306b7"
+    "SKILL.md": "ff173dfddfb982d0c44010af7ffa9d901d739338909aa64ecb0f002bace6edb6"
   }
 }

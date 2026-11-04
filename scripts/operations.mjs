@@ -7,7 +7,9 @@ export const HELP = {
   common: {'--spex-home': 'SPEX home; defaults to SPEX_HOME or ~/.spex', '--wait-seconds': 'Operation deadline; default 1800', '--scope': 'project (default) or personal for draft/package/config operations', '--host-agent': 'codex|claude, required on first use; later host changes do not reset configuration', '--host-model': 'Reliable current-host model; omit to use the adapter default on first use'},
   operations: {
     help: '', catalog: '[--query words]', inspect: '--workflow id [--package org/name]', 'project-add': '',
-    settings: '', configure: '--json-file config-edit-op.json',
+    settings: '(read-only; uninitialized environments return next: preflight without opening Core)',
+    preflight: '--host-agent codex|claude [--host-model model] (prepare once, then read effective settings; no workflow submission)',
+    configure: '--json-file config-edit-op.json',
     'agent-init': '--host-agent codex|claude [--host-model model] (initialize once)',
     'agent-configure': '--host-agent codex|claude [--host-model model] (explicitly replace Captain/Players and personal role overrides)',
     run: '--workflow id [--package org/name] --request-file request.txt', continue: '--session uuid --request-file followup.txt',
@@ -149,6 +151,7 @@ export async function execute(client, operation, args, {emit = () => {}, signal,
       const artifacts = workflow.present ? await client.request('playbook.artifacts', {playbookId: workflow.name, repository: workflow.repository}) : null;
       return {workflow, artifacts};
     }
+    case 'preflight':
     case 'settings': return {config: await client.request('config.get', project ? {projectId: project.id} : {}), readiness: await client.request('readiness.get')};
     case 'configure': {
       const scope = args.scope || 'project';

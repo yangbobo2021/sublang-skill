@@ -28,24 +28,39 @@ try {
     if (!Number.isFinite(seconds) || seconds <= 0) throw new SkillError('invalid_argument', '--wait-seconds must be positive.');
     if (!absolutePath(values.project)) throw new SkillError('project_required', '--project requires an absolute project root.');
     const home = resolve(values['spex-home'] || process.env.SPEX_HOME || resolve(homedir(), '.spex'));
-    const managesAgent = !NON_INITIALIZING_OPERATIONS.has(operation);
-    if (managesAgent && (operation === 'agent-configure' || !readAgentRecord(home))) hostSelection(values);
-    process.on('SIGINT', interrupt); process.on('SIGTERM', interrupt);
-    const deadline = setTimeout(interrupt, seconds * 1000);
-    try {
-      connection = await connect({runtime: resolve(dirname(fileURLToPath(import.meta.url)), '..'), home, emit});
-      if (controller.signal.aborted) throw new SkillError('interrupted', 'Canceled during SPEX connection preparation; no workflow was submitted.');
-      emit({event: 'core', mode: connection.owned ? 'temporary' : 'attached'});
-      const agent = managesAgent ? await ensureAgent(connection.client, home, values, {reset: operation === 'agent-configure', emit, signal: controller.signal}) : readAgentRecord(home);
-      let result = operation === 'agent-init' || operation === 'agent-configure' ? {initialization: agent, config: await connection.client.request('config.get')} :
-        await execute(connection.client, operation, values, {emit, signal: controller.signal, onCancel: fn => { cancel = fn; if (fn && controller.signal.aborted) void fn().catch(() => {}); }});
-      if (['project-add','package-add','package-install','package-update','draft-register'].includes(operation)) {
-        await ensureAgent(connection.client, home, values, {emit, signal: controller.signal});
-      }
-      if (operation === 'settings') result.initialization = agent;
-      if (controller.signal.aborted) throw new SkillError('interrupted', 'Operation deadline or signal interrupted work; inspect retained task state.');
-      process.stdout.write(JSON.stringify({ok: true, operation, result}) + '\n');
-    } finally { clearTimeout(deadline); }
+    const savedAgent = readAgentRecord(home);
+    // A diagnostic must not start Core and expose its credential-based seed
+    // as though it were the Skill's saved choice. Workflow preparation is an
+    // explicit, idempotent operation; an absent record is a normal first use.
+    if (operation === 'settings' && savedAgent?.status !== 'ready') {
+      process.stdout.write(JSON.stringify({ok: true, operation, result: {
+        initializationState: savedAgent?.status || 'uninitialized', initialization: savedAgent,
+        config: {status: 'not_loaded', reason: 'agent_uninitialized'}, readiness: [],
+        next: {operation: 'preflight', message: 'For a workflow request, run preflight with the current host Agent/model before comparing configuration. Missing initialization is a first-use state, not a configuration conflict. A settings-only request remains read-only.'},
+      }}) + '\n');
+    } else {
+      const managesAgent = !NON_INITIALIZING_OPERATIONS.has(operation);
+      if (managesAgent && (operation === 'agent-configure' || !savedAgent)) hostSelection(values);
+      process.on('SIGINT', interrupt); process.on('SIGTERM', interrupt);
+      const deadline = setTimeout(interrupt, seconds * 1000);
+      try {
+        connection = await connect({runtime: resolve(dirname(fileURLToPath(import.meta.url)), '..'), home, emit});
+        if (controller.signal.aborted) throw new SkillError('interrupted', 'Canceled during SPEX connection preparation; no workflow was submitted.');
+        emit({event: 'core', mode: connection.owned ? 'temporary' : 'attached'});
+        const agent = managesAgent ? await ensureAgent(connection.client, home, values, {reset: operation === 'agent-configure', emit, signal: controller.signal}) : readAgentRecord(home);
+        let result = operation === 'agent-init' || operation === 'agent-configure' ? {initialization: agent, config: await connection.client.request('config.get')} :
+          await execute(connection.client, operation, values, {emit, signal: controller.signal, onCancel: fn => { cancel = fn; if (fn && controller.signal.aborted) void fn().catch(() => {}); }});
+        if (['project-add','package-add','package-install','package-update','draft-register'].includes(operation)) {
+          await ensureAgent(connection.client, home, values, {emit, signal: controller.signal});
+        }
+        if (operation === 'settings' || operation === 'preflight') {
+          result.initialization = agent;
+          result.initializationState = agent?.status || 'uninitialized';
+        }
+        if (controller.signal.aborted) throw new SkillError('interrupted', 'Operation deadline or signal interrupted work; inspect retained task state.');
+        process.stdout.write(JSON.stringify({ok: true, operation, result}) + '\n');
+      } finally { clearTimeout(deadline); }
+    }
   }
 } catch (error) {
   process.stdout.write(JSON.stringify({ok: false, error: {code: error.code || 'operation_failed', message: error.message, ...(error.details ? {details: error.details} : {})}}) + '\n');

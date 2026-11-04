@@ -103,3 +103,59 @@ test('native CLI fails before Core without a first host, initializes Claude with
   assert.equal(result.status,0,result.stdout + result.stderr);
   assert.equal(result.json.result.config.summary.captain.adapter,'codex');
 });
+
+test('settings-first workflow preparation distinguishes first use from conflict for both hosts', {skip: !process.env.SUBLANG_TEST_RUNTIME, timeout:180000}, async t => {
+  for (const host of ['codex','claude']) await t.test(host, async t => {
+    const root = mkdtempSync(join(tmpdir(),'sublang preflight 中文 '));
+    t.after(() => rmSync(root,{recursive:true,force:true}));
+    const home = join(root,'spex'), project = join(root,'project'), user = join(root,'user');
+    mkdirSync(project); mkdirSync(user);
+    assert.equal(spawnSync('git',['init','-q',project]).status,0);
+    const env = {...process.env, HOME:user, USERPROFILE:user, CODEX_HOME:join(user,'.codex'), CLAUDE_CONFIG_DIR:join(user,'.claude')};
+    for (const key of ['OPENAI_API_KEY','CODEX_API_KEY','CODEX_ACCESS_TOKEN','CODEX_AUTH_CONTENT','ANTHROPIC_API_KEY','ANTHROPIC_AUTH_TOKEN','CLAUDE_CODE_OAUTH_TOKEN']) delete env[key];
+    const runtime = resolve(process.env.SUBLANG_TEST_RUNTIME);
+    const invoke = (operation, extra=[]) => {
+      const r = spawnSync(process.execPath,[join(runtime,'scripts/sublang.mjs'),operation,'--project',project,'--spex-home',home,...extra],{env,encoding:'utf8',timeout:60000});
+      assert.ifError(r.error); assert.equal(r.status,0,r.stdout+r.stderr);
+      return {result:JSON.parse(r.stdout).result, events:r.stderr};
+    };
+    // This is the route that previously stopped before initialization.
+    let diagnostic = invoke('settings');
+    assert.equal(diagnostic.result.initializationState,'uninitialized');
+    assert.equal(diagnostic.result.initialization,null);
+    assert.equal(diagnostic.result.config.status,'not_loaded');
+    assert.equal(diagnostic.result.next.operation,'preflight');
+    assert.equal(existsSync(home),false);
+    assert.equal(diagnostic.events,'');
+    // Existing Core-generated Claude defaults are not a saved Skill choice.
+    const core = await connect({runtime,home,coreOptions:{home:user,env,agentSignIn:async()=>({state:'signed-out'})}});
+    let seed;
+    try { seed = await core.client.request('config.get'); }
+    finally { await core.close(); }
+    const before = readFileSync(seed.summary.path,'utf8');
+    assert.equal(seed.summary.captain.adapter,'claude');
+    diagnostic = invoke('settings');
+    assert.equal(diagnostic.result.initializationState,'uninitialized');
+    assert.equal(diagnostic.result.config.status,'not_loaded');
+    assert.equal(readFileSync(seed.summary.path,'utf8'),before);
+    assert.equal(existsSync(join(home,'local/skill-agent.json')),false);
+    const args = ['--host-agent',host,...(host==='codex'?['--host-model','gpt-6.1-sol']:[])];
+    const prepared = invoke('preflight',args).result;
+    const expectedModel = host==='codex'?'gpt-6.1-sol':'claude-opus-5-5';
+    assert.equal(prepared.initializationState,'ready');
+    assert.equal(prepared.initialization.status,'ready');
+    assert.equal(prepared.config.summary.captain.adapter,host);
+    assert.equal(prepared.config.summary.captain.model,expectedModel);
+    assert.ok(prepared.config.summary.players.every(p=>p.agent.adapter===host && p.agent.model===expectedModel));
+    const configured = readFileSync(seed.summary.path,'utf8');
+    const checked = invoke('settings').result;
+    assert.equal(checked.initializationState,'ready');
+    assert.equal(checked.config.summary.captain.model,expectedModel);
+    // A later host cannot reset the saved choice; preparing never submits a
+    // workflow or resumes the historical session from a previous host.
+    invoke('preflight',['--host-agent',host==='codex'?'claude':'codex']);
+    assert.equal(readFileSync(seed.summary.path,'utf8'),configured);
+    invoke('project-add');
+    assert.deepEqual(invoke('sessions').result,[]);
+  });
+});

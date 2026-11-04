@@ -71,7 +71,7 @@ Windows 用 `scripts/setup.ps1` 代替 Shell 初始化。发布新版本时可�
 
 这些基础检查没有执行 extract-specs、decide、code 或 acceptance-orchestrate。四工作流交付验收由操作者按[12 步手动操作文档](https://github.com/yangbobo2021/skills-acceptance-demo/blob/main/MANUAL-ACCEPTANCE.md)逐步触发，不放进 CI；真实模型、人工 Gate 和完整工作流结果须另外取证。Windows 客户端按用户要求不新增所有者、私有权限或 DACL 检查。
 
-v1.0.1 修复 v1.0.0 首次初始化按凭据优先选择 Claude 的问题。升级现有安装后，历史会话仍保留原 Agent 快照；新会话使用初始化后的配置。
+v1.0.2 增加执行前 `preflight`，修复 v1.0.1 在 settings 预检查时把未初始化误当成配置冲突而停下的问题。未初始化时的 settings 不启动 Core、不生成 Claude 默认配置；首次业务调用由 Skill 自动准备，再核对设置。升级现有安装后，历史会话仍保留原 Agent 快照；新会话使用初始化后的配置。
 
 ## License
 

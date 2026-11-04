@@ -39,6 +39,10 @@ jobs:
           New-Item -ItemType Directory -Path $project | Out-Null
           git init -q $project
           if ($LASTEXITCODE -ne 0) { throw 'Fixture Git initialization failed' }
+          $diagnostic = & $prepared.node $prepared.cli settings --project $project --spex-home $state | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $diagnostic.result.initializationState -ne 'uninitialized' -or (Test-Path $state)) { throw 'Settings changed an uninitialized environment' }
+          $preflight = & $prepared.node $prepared.cli preflight --project $project --spex-home $state --host-agent codex --wait-seconds 90 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $preflight.result.initializationState -ne 'ready' -or $preflight.result.config.summary.captain.adapter -ne 'codex') { throw 'First-use preflight failed' }
           $catalog = & $prepared.node $prepared.cli catalog --project $project --spex-home $state --host-agent codex --wait-seconds 90 | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0 -or -not $catalog.ok -or $catalog.result.projectRegistered) { throw 'Initial discovery failed' }
           $added = & $prepared.node $prepared.cli project-add --project $project --spex-home $state --wait-seconds 90 | ConvertFrom-Json
